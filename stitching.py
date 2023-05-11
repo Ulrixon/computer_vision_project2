@@ -68,25 +68,104 @@ def warpTwoImages(img1, img2, H):
 
 
 
-def stitch_and_blend(img1,img2):
+def stitch_and_blend(img1,img2,algorithm="SIFT"):
 
     # Convert the images to grayscale
     gray1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
     gray2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
+    if(algorithm=="SIFT"):
+        # Initialize the SIFT detector
+        sift = cv2.SIFT_create()
 
-    # Initialize the SIFT detector
-    sift = cv2.SIFT_create()
+        # Find the keypoints and descriptors for both images using SIFT
+        kp1, des1 = sift.detectAndCompute(gray1, None)
+        kp2, des2 = sift.detectAndCompute(gray2, None)
 
-    # Find the keypoints and descriptors for both images using SIFT
-    kp1, des1 = sift.detectAndCompute(gray1, None)
-    kp2, des2 = sift.detectAndCompute(gray2, None)
 
-    # Use a Brute-Force Matcher to match the keypoints
-    bf = cv2.BFMatcher()
-    matches = bf.match(des1, des2)
+            # Use a Brute-Force Matcher to match the keypoints
+        bf = cv2.BFMatcher()
+        matches = bf.match(des1, des2)
 
-    # Sort the matches by their distance
-    matches = sorted(matches, key = lambda x:x.distance)
+        # Sort the matches by their distance
+        matches = sorted(matches, key = lambda x:x.distance)
+    elif(algorithm=="SURF"):
+        # Initialize the SURF detector and descriptor
+        surf = cv2.xfeatures2d.SURF_create()
+
+        # Find the keypoints and descriptors for both images using SURF
+        kp1, des1 = surf.detectAndCompute(gray1, None)
+        kp2, des2 = surf.detectAndCompute(gray2, None)
+
+            # Use a Brute-Force Matcher to match the keypoints
+        bf = cv2.BFMatcher()
+        matches = bf.match(des1, des2)
+
+        # Sort the matches by their distance
+        matches = sorted(matches, key = lambda x:x.distance)
+    
+    elif(algorithm=="FAST"):
+        fast = cv2.FastFeatureDetector_create()
+        brief = cv2.xfeatures2d.BriefDescriptorExtractor_create()
+
+        kp1 = fast.detect(gray1, None)
+        kp1, des1 = brief.compute(gray1, kp1)
+        kp2 = fast.detect(gray2, None)
+        kp2, des2 = brief.compute(gray2, kp2)
+        # Use a FLANN (Fast Library for Approximate Nearest Neighbors) matcher to match the keypoints
+        #flann_params = dict(algorithm=0, trees=5)
+        #matcher = cv2.FlannBasedMatcher(flann_params, {})
+        #matches_1 = matcher.knnMatch(des1, des2, k=2)
+
+        # Filter the matches using Lowe's ratio test
+        #matches = []
+        #for m, n in matches_1:
+        #    if m.distance < 0.7 * n.distance:
+        #        matches.append(m)
+        # Use a Brute-Force Matcher to match the keypoints
+        bf = cv2.BFMatcher()
+        matches = bf.match(des1, des2)
+
+        # Sort the matches by their distance
+        matches = sorted(matches, key = lambda x:x.distance)
+    elif(algorithm=="BRISK"):
+        brisk = cv2.BRISK_create()
+        kp1, des1 = brisk.detectAndCompute(gray1, None)
+        kp2, des2 = brisk.detectAndCompute(gray2, None)
+        bf = cv2.BFMatcher()
+        matches = bf.match(des1, des2)
+
+        # Sort the matches by their distance
+        matches = sorted(matches, key = lambda x:x.distance)
+
+    elif(algorithm=="ORB"):
+        orb = cv2.ORB_create()
+        kp1, des1 = orb.detectAndCompute(gray1, None)
+        kp2, des2 = orb.detectAndCompute(gray2, None)
+        bf = cv2.BFMatcher()
+        matches = bf.match(des1, des2)
+
+        # Sort the matches by their distance
+        matches = sorted(matches, key = lambda x:x.distance)
+
+    elif(algorithm=="KAZE"):
+        gray1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
+        gray2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
+
+        # Initialize the KAZE detector and descriptor
+        kaze = cv2.KAZE_create()
+        kp1, des1 = kaze.detectAndCompute(gray1, None)
+        kp2, des2 = kaze.detectAndCompute(gray2, None)
+
+        # Use a brute-force matcher to match the keypoints
+        bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
+        matches = bf.match(des1, des2)
+
+        # Sort the matches by distance
+        matches = sorted(matches, key=lambda x: x.distance)
+
+
+
+
 
     # Draw the top 10 matches on a new image
     #matching_img = cv2.drawMatches(img1, kp1, img2, kp2, matches[:10], None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
@@ -111,14 +190,16 @@ def stitch_and_blend(img1,img2):
 # Load the images
 
 
-img1 = cv2.imread("/mnt/c/Users/ryan7/Downloads/training-20230505T210618Z-001/training/input1/000003.jpg")
-img2 = cv2.imread("/mnt/c/Users/ryan7/Downloads/training-20230505T210618Z-001/training/input2/000003.jpg")
-
+img1 = cv2.imread("/mnt/c/Users/ryan7/Downloads/test_samples-20230511T131513Z-001/test_samples/left/001.jpg")
+img2 = cv2.imread("/mnt/c/Users/ryan7/Downloads/test_samples-20230511T131513Z-001/test_samples/right/001.jpg")
+#%%
 #plt.imshow("Matching Image", result.astype('uint8'))
-result=stitch_and_blend(img1,img2)
+result=stitch_and_blend(img1,img2,"SIFT")
 #img = Image.fromarray(result, 'RGB')
 #img.show()
-cv2.imshow("Stitched Image", result)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+#cv2.imshow("Stitched Image", result)
+
+#cv2.waitKey(0)
+#cv2.destroyAllWindows()
+cv2.imwrite('sample.png', result*255)
 # %%
