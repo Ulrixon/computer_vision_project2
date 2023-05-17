@@ -11,11 +11,11 @@ import skimage.exposure
 #%%
 def find_tetragon(img):
 # threshold image
-
+    
     ret,thresh = cv2.threshold(img*255,127,255,0)
-    cv2.imshow('threshold ',thresh)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    #cv2.imshow('threshold ',thresh)
+    #cv2.waitKey(0)
+    #cv2.destroyAllWindows()
     #print(thresh.shape)
 # dilate thresholded image - merges top/bottom 
     #kernel = np.ones((3,3), np.uint8)
@@ -27,7 +27,7 @@ def find_tetragon(img):
 # cv2.drawContours(img, contours, 0, (255,255,255), 3)
     #print(contours)
     #print ("contours:",len(contours))
-    #print ("largest contour has ",len(contours[0]),"points")
+    print ("largest contour has ",len(contours[0]),"points")
 
 # minAreaRect
 # rect = cv2.minAreaRect(contours[0])
@@ -70,6 +70,8 @@ def find_tetragon(img):
 
 def create_mask(gray): #mask to remove black background
 # threshold
+    #gray=gray*1
+    #np.clip(gray, 0, 255)
     thresh = cv2.threshold(gray, 11, 255, cv2.THRESH_BINARY)[1]
     #cv2.imshow('image',thresh)
 
@@ -93,10 +95,10 @@ def create_mask(gray): #mask to remove black background
     cv2.drawContours(contour, [big_contour], 0, 255, -1)
 
 # blur dilate image
-    blur = cv2.GaussianBlur(contour, (5,5), sigmaX=0, sigmaY=0, borderType = cv2.BORDER_DEFAULT)
+    #blur = cv2.GaussianBlur(contour, (5,5), sigmaX=0, sigmaY=0, borderType = cv2.BORDER_DEFAULT)
 
 # stretch so that 255 -> 255 and 127.5 -> 0
-    mask = skimage.exposure.rescale_intensity(blur, in_range=(127.5,255), out_range=(0,255))
+    mask = skimage.exposure.rescale_intensity(contour, in_range=(127.5,255), out_range=(0,255))
     return mask
 
 
@@ -131,13 +133,15 @@ def warpTwoImages(img1, img2, H):
     overlap_2[t[1]:h1+t[1],t[0]:w1+t[0]] = np.zeros([img1.shape[0],img1.shape[1]])+1
     overlap=overlap_1+overlap_2
     #overlap2d=(overlap[:,:,0]+overlap[:,:,1]+overlap[:,:,2])==6
-    overlap2d=(overlap)>1
-    axis=find_tetragon(np.float32(overlap2d))
-    #print(overlap_1.shape)
-    #cv2.imshow("Matching Image",np.float32(overlap2d) )
+    overlap2d=overlap>1
+    #cv2.imshow("Matching Image",np.float32(mask) )
 
     #cv2.waitKey(0)
     #cv2.destroyAllWindows()
+    #axis=0
+    axis=find_tetragon(np.float32(overlap2d[t[1]:,:]))
+    #print(overlap_1.shape)
+    #
 
 
 
@@ -159,7 +163,7 @@ def warpTwoImages(img1, img2, H):
     #cv2.waitKey(0)
     #cv2.destroyAllWindows()
 
-    return newimg,axis
+    return newimg[t[1]:,:],axis
 
 
 
@@ -252,7 +256,7 @@ def stitch_and_blend(img1,img2,algorithm="SIFT"):
         gray2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
 
         # Initialize the KAZE detector and descriptor
-        kaze = cv2.KAZE_create()
+        kaze = cv2.AKAZE_create()
         kp1, des1 = kaze.detectAndCompute(gray1, None)
         kp2, des2 = kaze.detectAndCompute(gray2, None)
 
@@ -264,11 +268,13 @@ def stitch_and_blend(img1,img2,algorithm="SIFT"):
         matches = sorted(matches, key=lambda x: x.distance)
 
 
-
+    ##for m, n in matches:
+    #    if m.distance < 0.75 * n.distance:
+    #        good_matches.append(m)
 
 
     # Draw the top 10 matches on a new image
-    #matching_img = cv2.drawMatches(img1, kp1, img2, kp2, matches[:10], None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+    #matching_img = cv2.drawMatches(img1, kp1, img2, kp2, matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
 
     # Display the matching image
     #cv2.imshow("Matching Image", matching_img)
@@ -282,6 +288,10 @@ def stitch_and_blend(img1,img2,algorithm="SIFT"):
     #result[0:img1.shape[0], 0:img1.shape[1]] = img1
     #result[0:img2.shape[0], 0:img2.shape[1]] = img2
     #result = cv2.warpPerspective(img2, H, ((img1.shape[1]+img2.shape[1]), img1.shape[0]+100))
+    #cv2.imshow("Stitched Image", img2)
+
+    #cv2.waitKey(0)
+    #cv2.destroyAllWindows()
     result,axis = warpTwoImages(img1, img2, H)
     # Display the stitched image
     #result.show()
@@ -317,6 +327,14 @@ for text in files:
     img2 = cv2.imread(data_path+ r"/right/"+text)
     result,axis=stitch_and_blend(img1,img2,"KAZE")
 #img = Image.fromarray(result, 'RGB')
+    path = './sample/overlap.txt'
+    with open(path, 'a') as f:
+        
+        f.write(text.replace(".jpg", "")+' ')
+        for i in [0,3,2,1]:
+            f.write(str(axis[i,0,1])+' '+str(axis[i,0,0])+' ')
+        f.write("\n")
+        
 
 
     #cv2.drawContours(result, [axis], 0, (0,255,0), 3)
@@ -326,7 +344,7 @@ for text in files:
 #cv2.waitKey(0)
 #cv2.destroyAllWindows()
     name=text.replace(".jpg", "")
-    cv2.imwrite('sample/'+name+'.png', result*255)
+    cv2.imwrite('sample/'+name+'.jpg', result*255)
 
 
 #print("found", total_size, "files.")
@@ -335,16 +353,19 @@ for text in files:
 #%%
 #img1 = cv2.imread("/mnt/c/Users/ryan7/Downloads/test_samples-20230511T131513Z-001/test_samples/left/001.jpg")
 #img2 = cv2.imread("/mnt/c/Users/ryan7/Downloads/test_samples-20230511T131513Z-001/test_samples/right/001.jpg")
+#cv2.imshow("Stitched Image", img2)
+
+#cv2.waitKey(0)
+#cv2.destroyAllWindows()
+
 #%%
-
-
 
 #plt.imshow("Matching Image", result.astype('uint8'))
 #result,axis=stitch_and_blend(img1,img2,"KAZE")
 #img = Image.fromarray(result, 'RGB')
 #img.show()
 
-
+#result,axis=stitch_and_blend(img1,img2,"KAZE")
 #cv2.drawContours(result, [axis], 0, (0,255,0), 3)
 
 #cv2.imshow("Stitched Image", result)
